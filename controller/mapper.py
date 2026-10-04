@@ -312,12 +312,19 @@ class InputMapper:
         if not triggers_cfg.get("rt_left_click", True):
             return
         threshold = triggers_cfg.get("threshold", 0.3)
+        has_layer = bool(schema.get("rt_layer", {}))
+        
         if state.right_trigger > threshold and not self._rt_down:
             self._rt_down = True
-            self.actions.execute_press("left_click", source="rt")
+            self._rt_layer_used = False
+            if not has_layer:
+                self.actions.execute_press("left_click", source="rt")
         elif state.right_trigger <= threshold - 0.08 and self._rt_down:
             self._rt_down = False
-            self.actions.execute_release("left_click", source="rt")
+            if not has_layer:
+                self.actions.execute_release("left_click", source="rt")
+            elif not getattr(self, "_rt_layer_used", False):
+                self.actions.tap("left_click", source="rt")
 
     def _process_left_trigger(self, state: GamepadState, schema: Dict[str, Any]):
         triggers_cfg = schema.get("triggers", {})
@@ -325,16 +332,22 @@ class InputMapper:
         if triggers_cfg.get("lt_precision_aim", True) and not action:
             return
         threshold = triggers_cfg.get("threshold", 0.3)
+        has_layer = bool(schema.get("lt_layer", {}))
+        
         if state.left_trigger > threshold and not self._lt_down:
             self._lt_down = True
-            if action:
+            self._lt_layer_used = False
+            if action and not has_layer:
                 self._active_action["lt"] = action
                 self.actions.execute_press(action, source="lt")
         elif state.left_trigger <= threshold - 0.08 and self._lt_down:
             self._lt_down = False
-            prev_action = self._active_action.pop("lt", None)
-            if prev_action:
-                self.actions.execute_release(prev_action, source="lt")
+            if action and not has_layer:
+                prev_action = self._active_action.pop("lt", None)
+                if prev_action:
+                    self.actions.execute_release(prev_action, source="lt")
+            elif action and has_layer and not getattr(self, "_lt_layer_used", False):
+                self.actions.tap(action, source="lt")
 
     def _process_buttons(self, state: GamepadState, now: float, combo_enabled: bool, schema: Dict[str, Any]):
         buttons_cfg = schema.get("buttons", {})
@@ -397,10 +410,12 @@ class InputMapper:
                 elif state.back and name in back_layer:
                     action = back_layer[name]
                     self._combo_consumed = True  # Back was used as a modifier
-                elif state.left_trigger > 0.3 and name in lt_layer:
+                elif state.left_trigger > schema.get("triggers", {}).get("threshold", 0.3) and name in lt_layer:
                     action = lt_layer[name]
-                elif state.right_trigger > 0.3 and name in rt_layer:
+                    self._lt_layer_used = True
+                elif state.right_trigger > schema.get("triggers", {}).get("threshold", 0.3) and name in rt_layer:
                     action = rt_layer[name]
+                    self._rt_layer_used = True
                 elif active_proc in app_profiles and name in app_profiles[active_proc]:
                     action = app_profiles[active_proc][name]
                 else:
