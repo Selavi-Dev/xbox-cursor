@@ -14,6 +14,10 @@ from PIL import Image, ImageDraw
 from controller.xinput import GamepadState
 from controller.mapper import InputMapper
 from ui.radial import RadialMenu
+try:
+    from version import CONTROL_PANEL_VERSION_ID
+except ImportError:
+    CONTROL_PANEL_VERSION_ID = "XboxDesktopNavigator-ControlPanel-v1.0.0"
 
 class ControllerAppGUI:
     """Live telemetry monitor, interactive spatial HUD, and configuration GUI."""
@@ -23,8 +27,8 @@ class ControllerAppGUI:
         self.mapper = mapper
         self.config_path = config_path
 
-        self.root.title("Xbox Desktop Navigator - Control Panel")
-        self.root.geometry("960x780")
+        self.root.title(f"Xbox Desktop Navigator - Control Panel [{CONTROL_PANEL_VERSION_ID}]")
+        self.root.geometry("980x780")
         self.root.minsize(860, 680)
         self.root.configure(bg="#18181b")
 
@@ -137,6 +141,17 @@ class ControllerAppGUI:
 
         title_lbl = tk.Label(header, text="🎮 Xbox Desktop Navigator", font=("Segoe UI", 18, "bold"), bg="#18181b", fg="#ffffff")
         title_lbl.pack(side=tk.LEFT)
+
+        self.version_badge = tk.Label(
+            header,
+            text=CONTROL_PANEL_VERSION_ID,
+            font=("Segoe UI", 8, "bold"),
+            bg="#27272a",
+            fg="#a1a1aa",
+            padx=8,
+            pady=3,
+        )
+        self.version_badge.pack(side=tk.LEFT, padx=(12, 0), pady=(4, 0))
 
         self.mode_badge = tk.Label(header, text="Desktop Mode Active", font=("Segoe UI", 11, "bold"), bg="#065f46", fg="#34d399", padx=14, pady=5)
         self.mode_badge.pack(side=tk.RIGHT, padx=5)

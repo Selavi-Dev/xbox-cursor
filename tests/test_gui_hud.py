@@ -25,6 +25,11 @@ class TestHudPaddleGuards(unittest.TestCase):
         ControllerAppGUI._update_btn_visual(gui, "a", True)
         self.assertTrue(gui.cv.itemconfig.called)
 
+    def test_version_identifier_format(self):
+        from version import VERSION_ID, CONTROL_PANEL_VERSION_ID
+        self.assertTrue(VERSION_ID.startswith("v"))
+        self.assertEqual(CONTROL_PANEL_VERSION_ID, f"XboxDesktopNavigator-ControlPanel-{VERSION_ID}")
+
 
 if __name__ == "__main__":
     unittest.main()
