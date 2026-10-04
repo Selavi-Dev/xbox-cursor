@@ -98,7 +98,13 @@ class InputMapper:
 
     def toggle_enabled(self) -> bool:
         """Toggle desktop control mode on/off."""
-        self.is_enabled = not self.is_enabled
+        if getattr(self, "_auto_paused", False) and not getattr(self, "_force_resume", False):
+            self._force_resume = True
+            self.is_enabled = True
+        else:
+            self.is_enabled = not self.is_enabled
+            self._force_resume = False
+            
         self._reset_input_state()
         rumble = self.config.get("features", {}).get("rumble_feedback", True)
 
@@ -155,8 +161,12 @@ class InputMapper:
         schemas = self.config.get("schemas")
         if not schemas:
             return self.config
-        if getattr(self, "_auto_paused", False) or not self.is_enabled:
-            return schemas.get("gaming", {})
+            
+        is_auto = getattr(self, "_auto_paused", False)
+        force = getattr(self, "_force_resume", False)
+        
+        if not self.is_enabled or (is_auto and not force):
+            return {}
         return schemas.get("desktop", {})
 
     def process_frame(self, state: GamepadState, now: Optional[float] = None):
@@ -176,6 +186,8 @@ class InputMapper:
                 from .win_tracker import get_active_window_info
                 proc, is_fs = get_active_window_info()
                 self._active_proc = proc
+                if not is_fs:
+                    self._force_resume = False
                 self._auto_paused = is_fs and features_cfg.get("auto_pause_in_fullscreen_games", True)
             except Exception:
                 self._active_proc = ""
@@ -211,10 +223,11 @@ class InputMapper:
             self._reset_input_state()
             self._last_schema = schema
 
-        self._process_motion(state, dt, now, schema)
-        self._process_right_trigger(state, schema)
-        self._process_left_trigger(state, schema)
-        self._process_buttons(state, now, combo_enabled, schema)
+        if schema:
+            self._process_motion(state, dt, now, schema)
+            self._process_right_trigger(state, schema)
+            self._process_left_trigger(state, schema)
+            self._process_buttons(state, now, combo_enabled, schema)
 
         if not state.back and not state.start:
             self._combo_consumed = False
