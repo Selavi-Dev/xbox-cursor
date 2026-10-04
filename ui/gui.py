@@ -235,6 +235,12 @@ class ControllerAppGUI:
         self._add_trigger("lt", cx - 130, cy - 165, cx - 290, cy - 105, "e", "Precision Aim (Slow)")
         self._add_trigger("rt", cx + 130, cy - 165, cx + 290, cy - 105, "w", "Left Click (Drag)")
         
+        # Sidewings (AGL / AGR)
+        agl_pts = [cx - 215, cy + 30, cx - 245, cy + 60, cx - 245, cy + 90, cx - 200, cy + 120]
+        agr_pts = [cx + 215, cy + 30, cx + 245, cy + 60, cx + 245, cy + 90, cx + 200, cy + 120]
+        self._add_sidewing("agl", agl_pts, cx - 290, cy + 100, "e", "Desktop Left")
+        self._add_sidewing("agr", agr_pts, cx + 290, cy + 100, "w", "Desktop Right")
+        
         # Central Game Mode combo hint
         cv.create_text(cx, cy + 140, text="Hold Back + Start for 1.2s to toggle Game Mode", fill="#52525b", font=("Segoe UI", 10, "italic"))
 
@@ -285,6 +291,18 @@ class ControllerAppGUI:
         self.hud[f'lbl_{name}'] = self.cv.create_text(tx + (10 if anchor=="w" else -10), ty, text=callout, fill="#a1a1aa", anchor=anchor, font=("Segoe UI", 10))
         self.hud[f'base_x_{name}'] = x
         self.hud[f'base_y_{name}'] = y
+
+    def _add_sidewing(self, name, x_pts, tx, ty, anchor, callout):
+        bg = self.cv.create_polygon(x_pts, smooth=True, fill="#27272a", outline="#52525b", width=1.5)
+        mid_x = sum(x_pts[0::2]) / (len(x_pts) // 2)
+        mid_y = sum(x_pts[1::2]) / (len(x_pts) // 2)
+        line = self.cv.create_line(mid_x, mid_y, tx, ty, fill="#3f3f46", width=2)
+        lbl = self.cv.create_text(tx + (10 if anchor=="w" else -10), ty, text=callout, fill="#a1a1aa", anchor=anchor, font=("Segoe UI", 10))
+        
+        self.hud[f'btn_{name}'] = bg
+        self.hud[f'line_{name}'] = line
+        self.hud[f'lbl_{name}'] = lbl
+        self.hud[f'txt_{name}'] = self.cv.create_text(-1000, -1000, text="")
 
     # -------------------------------------------------------------------------
     # MAPPING TAB
@@ -341,7 +359,7 @@ class ControllerAppGUI:
             "a", "b", "x", "y", 
             "lb", "rb", "ls_click", "rs_click", 
             "dpad_up", "dpad_down", "dpad_left", "dpad_right", 
-            "start", "back"
+            "start", "back", "agl", "agr"
         ]
         
         actions_list = [
@@ -362,14 +380,15 @@ class ControllerAppGUI:
             "ls_click": "Left Stick Click", "rs_click": "Right Stick Click",
             "dpad_up": "D-Pad Up", "dpad_down": "D-Pad Down", 
             "dpad_left": "D-Pad Left", "dpad_right": "D-Pad Right",
-            "start": "Start (Menu)", "back": "Back (View)"
+            "start": "Start (Menu)", "back": "Back (View)",
+            "agl": "AGL (Left Grip)", "agr": "AGR (Right Grip)"
         }
         
         display_actions = [a.replace("_", " ").title() for a in actions_list]
         
         for i, btn in enumerate(buttons_list):
-            row = i % 7
-            col = i // 7 * 2
+            row = i % 8
+            col = (i // 8) * 2
             
             friendly_name = friendly_btn_names.get(btn, btn.upper())
             lbl = tk.Label(grid_frame, text=friendly_name + ": ", font=("Segoe UI", 11, "bold"), bg="#27272a", fg="#f4f4f5", width=16, anchor="e")
@@ -406,8 +425,8 @@ class ControllerAppGUI:
         mouse_cfg = desktop_cfg.get("mouse", {})
         scroll_cfg = desktop_cfg.get("scroll", {})
 
-        self.speed_var = tk.DoubleVar(value=mouse_cfg.get("base_speed", 22.0))
-        self._create_slider(container, "Cursor Base Speed:", self.speed_var, 5.0, 50.0, 1.0, "pixels/tick")
+        self.speed_var = tk.DoubleVar(value=mouse_cfg.get("base_speed", 5.0))
+        self._create_slider(container, "Cursor Base Speed:", self.speed_var, 1.0, 30.0, 0.5, "pixels/tick")
 
         self.exp_var = tk.DoubleVar(value=mouse_cfg.get("acceleration_exponent", 1.85))
         self._create_slider(container, "Acceleration Exponent (Curve):", self.exp_var, 1.0, 3.0, 0.05, "power")
@@ -636,6 +655,8 @@ class ControllerAppGUI:
                 self._update_btn_visual("rb", state.right_shoulder)
                 self._update_btn_visual("start", state.start)
                 self._update_btn_visual("back", state.back)
+                self._update_btn_visual("agl", getattr(state, "agl", False))
+                self._update_btn_visual("agr", getattr(state, "agr", False))
 
                 # D-Pad Cross & Media Layer dynamic callout
                 dpad_active = state.dpad_up or state.dpad_down or state.dpad_left or state.dpad_right
@@ -691,7 +712,8 @@ class ControllerAppGUI:
                     self.cv.itemconfig(self.hud['lbl_rs'], fill="#a1a1aa", font=("Segoe UI", 10))
 
                 # Radial Menu Trigger (Back button)
-                if state.back:
+                schema = self.mapper.get_active_schema()
+                if state.back and schema:
                     self.radial.show()
                     # Feed right stick inverted Y for standard cartesian math
                     self.radial.update_stick(state.thumb_rx, state.thumb_ry)

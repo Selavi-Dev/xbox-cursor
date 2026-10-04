@@ -87,10 +87,6 @@ class ActionManager:
         }
 
     def _dictation_toggle(self):
-        import time
-        self.win.left_down()
-        self.win.left_up()
-        time.sleep(0.05)
         self.win.send_combo([VK_LWIN, 0x48])
 
     @property

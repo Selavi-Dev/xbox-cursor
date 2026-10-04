@@ -292,20 +292,22 @@ class InputMapper:
                 speed = mouse_cfg.get("base_speed", 5.0) * speed_multiplier * tick_scale
                 self.win.move_cursor_delta(cx * speed, -cy * speed)
 
-        # Right stick scroll
-        rs_deadzone = scroll_cfg.get("deadzone", 0.22)
-        emit, self._scroll_accum_v = self._scroll_axis(
-            state.thumb_ry, rs_deadzone, scroll_cfg.get("vertical_speed", 20.0), dt, self._scroll_accum_v
-        )
-        if emit:
-            self.win.scroll_vertical(emit)
-
-        if scroll_cfg.get("horizontal_enabled", True):
-            emit, self._scroll_accum_h = self._scroll_axis(
-                state.thumb_rx, rs_deadzone, scroll_cfg.get("horizontal_speed", 15.0), dt, self._scroll_accum_h
+        # Right stick scroll (suppress if radial menu modifier is active)
+        is_radial = state.back and schema.get("buttons", {}).get("back") == "radial_menu_modifier"
+        if not is_radial:
+            rs_deadzone = scroll_cfg.get("deadzone", 0.22)
+            emit, self._scroll_accum_v = self._scroll_axis(
+                state.thumb_ry, rs_deadzone, scroll_cfg.get("vertical_speed", 20.0), dt, self._scroll_accum_v
             )
             if emit:
-                self.win.scroll_horizontal(emit)
+                self.win.scroll_vertical(emit)
+
+            if scroll_cfg.get("horizontal_enabled", True):
+                emit, self._scroll_accum_h = self._scroll_axis(
+                    state.thumb_rx, rs_deadzone, scroll_cfg.get("horizontal_speed", 15.0), dt, self._scroll_accum_h
+                )
+                if emit:
+                    self.win.scroll_horizontal(emit)
 
     def _process_right_trigger(self, state: GamepadState, schema: Dict[str, Any]):
         triggers_cfg = schema.get("triggers", {})
