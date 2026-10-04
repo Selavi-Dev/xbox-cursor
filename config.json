@@ -1,0 +1,118 @@
+{
+  "schemas": {
+    "desktop": {
+      "mouse": {
+        "base_speed": 10.0,
+        "acceleration_exponent": 3.0,
+        "deadzone": 0.15,
+        "turbo_multiplier": 2.3,
+        "precision_multiplier": 0.6,
+        "poll_rate_hz": 120,
+        "auto_turbo": {
+          "enabled": true,
+          "full_tilt_threshold": 0.95,
+          "delay_seconds": 0.4,
+          "ramp_seconds": 0.5
+        }
+      },
+      "scroll": {
+        "vertical_speed": 20.0,
+        "horizontal_speed": 15.0,
+        "deadzone": 0.22,
+        "horizontal_enabled": true
+      },
+      "triggers": {
+        "rt_left_click": true,
+        "lt_precision_aim": false,
+        "lt_action": "enter",
+        "threshold": 0.3
+      },
+      "buttons": {
+        "b": "right_click",
+        "x": "enter",
+        "y": "dictation_toggle",
+        "rb": "browser_forward",
+        "ls_click": "media_play_pause",
+        "rs_click": "middle_click",
+        "dpad_up": "arrow_up",
+        "dpad_down": "arrow_down",
+        "dpad_left": "arrow_left",
+        "dpad_right": "arrow_right",
+        "start": "win_key",
+        "back": "radial_menu_modifier",
+        "a": "left_click"
+      },
+      "lt_layer": {
+        "a": "copy",
+        "b": "paste",
+        "x": "undo",
+        "y": "save",
+        "rb": "desktop_right"
+      },
+      "rt_layer": {
+        "lb": "desktop_left"
+      },
+      "double_clicks": {
+        "back": "task_view",
+        "b": "backspace"
+      }
+    },
+    "gaming": {
+      "mouse": {
+        "base_speed": 15.0,
+        "acceleration_exponent": 1.0,
+        "deadzone": 0.15,
+        "turbo_multiplier": 1.0,
+        "precision_multiplier": 1.0,
+        "auto_turbo": {
+          "enabled": false
+        }
+      },
+      "triggers": {
+        "rt_left_click": true,
+        "lt_precision_aim": false,
+        "threshold": 0.3
+      },
+      "left_stick_mode": "wasd",
+      "buttons": {
+        "a": "key_space",
+        "b": "key_c",
+        "x": "key_r",
+        "y": "key_f",
+        "lb": "key_q",
+        "rb": "key_e",
+        "ls_click": "key_shift",
+        "rs_click": "middle_click",
+        "dpad_up": "key_1",
+        "dpad_down": "key_2",
+        "dpad_left": "key_3",
+        "dpad_right": "key_4",
+        "start": "key_esc",
+        "back": "key_tab"
+      }
+    }
+  },
+  "app_profiles": {
+    "chrome.exe": {
+      "lb": "browser_prev_tab",
+      "rb": "browser_next_tab"
+    },
+    "msedge.exe": {
+      "lb": "browser_prev_tab",
+      "rb": "browser_next_tab"
+    }
+  },
+  "back_layer": {
+    "dpad_up": "volume_up",
+    "dpad_down": "volume_down",
+    "dpad_left": "media_prev",
+    "dpad_right": "media_next"
+  },
+  "features": {
+    "auto_pause_in_fullscreen_games": true,
+    "toggle_combo_enabled": true,
+    "toggle_hold_seconds": 1.2,
+    "rumble_feedback": true,
+    "start_enabled": true
+  }
+}
