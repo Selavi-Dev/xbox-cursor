@@ -31,7 +31,10 @@ def make_mapper():
                      "rumble_feedback": False, "start_enabled": True},
     }
     win = MagicMock()
-    return InputMapper(config, MagicMock(), win), win
+    m = InputMapper(config, MagicMock(), win)
+    m.process_frame(frame(0), now=-2/120)
+    m.process_frame(frame(0), now=-1/120)
+    return m, win
 
 
 class TestAuditRegressions(unittest.TestCase):
@@ -101,6 +104,34 @@ class TestAuditRegressions(unittest.TestCase):
         self.assertTrue(m.is_enabled)
         m.process_frame(frame(0), now=0.0)
         self.assertFalse(m.is_enabled)
+
+    def test_radial_modifier_is_not_tapped_on_back_release(self):
+        config = {
+            "schemas": {
+                "desktop": {
+                    "mouse": {"base_speed": 5.0, "acceleration_exponent": 2.0, "deadzone": 0.2},
+                    "scroll": {"vertical_speed": 4.0, "horizontal_speed": 3.0, "deadzone": 0.2},
+                    "triggers": {"rt_left_click": True, "threshold": 0.3},
+                    "buttons": {"back": "radial_menu_modifier", "start": "win_key"},
+                }
+            },
+            "features": {
+                "toggle_combo_enabled": True,
+                "toggle_hold_seconds": 1.2,
+                "rumble_feedback": False,
+                "start_enabled": True,
+            },
+        }
+        win = MagicMock()
+        m = InputMapper(config, MagicMock(), win)
+        m.process_frame(frame(0), now=-2 / 120)
+        m.process_frame(frame(0), now=-1 / 120)
+        m.process_frame(frame(XINPUT_GAMEPAD_BACK), now=0.0)
+        m.process_frame(frame(0), now=0.1)
+        # Modifier must not become a synthetic key/mouse action.
+        win.key_press.assert_not_called()
+        win.send_combo.assert_not_called()
+        win.show_desktop.assert_not_called()
 
 
 if __name__ == "__main__":

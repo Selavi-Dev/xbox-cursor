@@ -42,6 +42,8 @@ class TestInputMapper(unittest.TestCase):
             },
         }
         self.mapper = InputMapper(self.config, self.mock_driver, self.mock_win)
+        self.mapper.process_frame(GamepadState(0,0,0,0,0,0,0,0), now=-2/120)
+        self.mapper.process_frame(GamepadState(0,0,0,0,0,0,0,0), now=-1/120)
 
     def test_deadzone_below_threshold(self):
         # Stick within deadzone (0.1 < 0.2)
@@ -91,6 +93,7 @@ class TestInputMapper(unittest.TestCase):
         self.mock_win.left_up.assert_called_once()
 
     def test_toggle_enabled(self):
+        self.mock_win.release_all_mouse_buttons.reset_mock()
         self.assertTrue(self.mapper.is_enabled)
         res = self.mapper.toggle_enabled()
         self.assertFalse(res)

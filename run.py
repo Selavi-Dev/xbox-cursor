@@ -46,10 +46,12 @@ class ControllerService:
     def stop(self):
         self.running = False
         self.mapper.actions.release_all()
+        if self.worker_thread and self.worker_thread.is_alive():
+            self.worker_thread.join(timeout=1.0)
 
     def _poll_loop(self):
         """High-frequency polling loop (120Hz default)."""
-        poll_hz = self.config.get("mouse", {}).get("poll_rate_hz", 120)
+        poll_hz = self.config.get("schemas", {}).get("desktop", {}).get("mouse", {}).get("poll_rate_hz", 120)
         poll_interval = 1.0 / max(30, min(240, poll_hz))
 
         reconnect_check_interval = 1.0

@@ -166,6 +166,14 @@ class GamepadState(NamedTuple):
     def paddle4(self) -> bool:
         return bool(self.buttons & XINPUT_GAMEPAD_PADDLE4)
 
+    @property
+    def agl(self) -> bool:
+        return bool(self.buttons & XINPUT_GAMEPAD_PADDLE1)
+
+    @property
+    def agr(self) -> bool:
+        return bool(self.buttons & XINPUT_GAMEPAD_PADDLE2)
+
 
 class XInputDriver:
     """Manages communication with Windows XInput DLLs."""

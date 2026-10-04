@@ -23,7 +23,8 @@ REPEATABLE_ACTIONS = {
 }
 
 COMBO_BUTTONS = ("back", "start")
-MODIFIER_ACTIONS = {"turbo_speed"}
+# Modifiers are never tapped/pressed as actions; they change other inputs' meaning.
+MODIFIER_ACTIONS = {"turbo_speed", "radial_menu_modifier"}
 
 
 class InputMapper:
@@ -67,7 +68,7 @@ class InputMapper:
         self._last_frame_time: Optional[float] = None
 
         # Listeners (invoked on the polling thread — must not touch Tk widgets directly)
-        self.on_state_update: Optional[Callable[[GamepadState, bool], None]] = None
+        self.on_state_update: Optional[Callable[..., None]] = None
         self.on_mode_change: Optional[Callable[[bool], None]] = None
 
     # ------------------------------------------------------------------ control
@@ -78,19 +79,53 @@ class InputMapper:
     def set_connected(self, connected: bool):
         self.connected = connected
         if not connected:
-            self.actions.release_all()
-            self._rt_down = False
-            self._button_states.clear()
-            self._repeat_next.clear()
+            self._reset_input_state()
             self._last_frame_time = None
-            self._scroll_accum_v = self._scroll_accum_h = 0.0
+
+    def _reset_input_state(self, state: Optional[GamepadState] = None):
+        """Reset all tracked state to prevent stuck keys and phantom inputs."""
+        self.actions.release_all()
+        if state:
+            self._rt_down = state.right_trigger > 0.3
+            self._lt_down = state.left_trigger > 0.3
+            self._button_states = {
+                "a": state.a, "b": state.b, "x": state.x, "y": state.y,
+                "lb": state.left_shoulder, "rb": state.right_shoulder,
+                "ls_click": state.left_thumb_click, "rs_click": state.right_thumb_click,
+                "dpad_up": state.dpad_up, "dpad_down": state.dpad_down,
+                "dpad_left": state.dpad_left, "dpad_right": state.dpad_right,
+                "start": state.start, "back": state.back,
+                "paddle1": getattr(state, 'paddle1', False),
+                "paddle2": getattr(state, 'paddle2', False),
+                "paddle3": getattr(state, 'paddle3', False),
+                "paddle4": getattr(state, 'paddle4', False),
+                "agl": getattr(state, 'agl', False),
+                "agr": getattr(state, 'agr', False),
+            }
+        else:
+            self._rt_down = False
+            self._lt_down = False
+            self._button_states.clear()
+            
+        self._repeat_next.clear()
+        self._active_action.clear()
+        if hasattr(self, "_wasd_state"):
+            self._wasd_state.clear()
+        self._combo_start_time = None
+        self._combo_triggered = False
+        self._combo_consumed = False
+        self._scroll_accum_v = self._scroll_accum_h = 0.0
 
     def toggle_enabled(self) -> bool:
         """Toggle desktop control mode on/off."""
-        self.is_enabled = not self.is_enabled
-        self.actions.release_all()
-        self._repeat_next.clear()
-        self._scroll_accum_v = self._scroll_accum_h = 0.0
+        if getattr(self, "_auto_paused", False) and not getattr(self, "_force_resume", False):
+            self._force_resume = True
+            self.is_enabled = True
+        else:
+            self.is_enabled = not self.is_enabled
+            self._force_resume = False
+            
+        self._reset_input_state()
         rumble = self.config.get("features", {}).get("rumble_feedback", True)
 
         if rumble:
@@ -143,11 +178,16 @@ class InputMapper:
 
     # ------------------------------------------------------------------ frame
     def get_active_schema(self) -> Dict[str, Any]:
+        is_auto = getattr(self, "_auto_paused", False)
+        force = getattr(self, "_force_resume", False)
+        
+        if not self.is_enabled or (is_auto and not force):
+            return {}
+            
         schemas = self.config.get("schemas")
         if not schemas:
             return self.config
-        if getattr(self, "_auto_paused", False) or not self.is_enabled:
-            return schemas.get("gaming", {})
+            
         return schemas.get("desktop", {})
 
     def process_frame(self, state: GamepadState, now: Optional[float] = None):
@@ -167,6 +207,8 @@ class InputMapper:
                 from .win_tracker import get_active_window_info
                 proc, is_fs = get_active_window_info()
                 self._active_proc = proc
+                if not is_fs:
+                    self._force_resume = False
                 self._auto_paused = is_fs and features_cfg.get("auto_pause_in_fullscreen_games", True)
             except Exception:
                 self._active_proc = ""
@@ -193,12 +235,20 @@ class InputMapper:
         if self.on_state_update:
             self.on_state_update(state, self.is_enabled, getattr(self, "_auto_paused", False))
 
-        # Core Routing: We always process input, but we route it to the active schema!
+        # Desktop schema when enabled; empty schema = Game Mode pass-through (no injection).
         schema = self.get_active_schema()
-        self._process_motion(state, dt, now, schema)
-        self._process_right_trigger(state, schema)
-        self._process_left_trigger(state, schema)
-        self._process_buttons(state, now, combo_enabled, schema)
+
+        # Reset input state when entering/leaving pass-through so nothing sticks.
+        old_schema_id = id(getattr(self, "_last_schema", None))
+        if id(schema) != old_schema_id:
+            self._reset_input_state(state)
+            self._last_schema = schema
+
+        if schema:
+            self._process_motion(state, dt, now, schema)
+            self._process_right_trigger(state, schema)
+            self._process_left_trigger(state, schema)
+            self._process_buttons(state, now, combo_enabled, schema)
 
         if not state.back and not state.start:
             self._combo_consumed = False
@@ -260,35 +310,44 @@ class InputMapper:
                 mouse_cfg.get("acceleration_exponent", 1.85),
             )
             if cx != 0.0 or cy != 0.0:
-                speed = mouse_cfg.get("base_speed", 22.0) * speed_multiplier * tick_scale
+                speed = mouse_cfg.get("base_speed", 5.0) * speed_multiplier * tick_scale
                 self.win.move_cursor_delta(cx * speed, -cy * speed)
 
-        # Right stick scroll
-        rs_deadzone = scroll_cfg.get("deadzone", 0.22)
-        emit, self._scroll_accum_v = self._scroll_axis(
-            state.thumb_ry, rs_deadzone, scroll_cfg.get("vertical_speed", 20.0), dt, self._scroll_accum_v
-        )
-        if emit:
-            self.win.scroll_vertical(emit)
-
-        if scroll_cfg.get("horizontal_enabled", True):
-            emit, self._scroll_accum_h = self._scroll_axis(
-                state.thumb_rx, rs_deadzone, scroll_cfg.get("horizontal_speed", 15.0), dt, self._scroll_accum_h
+        # Right stick scroll (suppress if radial menu modifier is active)
+        is_radial = state.back and schema.get("buttons", {}).get("back") == "radial_menu_modifier"
+        if not is_radial:
+            rs_deadzone = scroll_cfg.get("deadzone", 0.22)
+            emit, self._scroll_accum_v = self._scroll_axis(
+                state.thumb_ry, rs_deadzone, scroll_cfg.get("vertical_speed", 20.0), dt, self._scroll_accum_v
             )
             if emit:
-                self.win.scroll_horizontal(emit)
+                self.win.scroll_vertical(emit)
+
+            if scroll_cfg.get("horizontal_enabled", True):
+                emit, self._scroll_accum_h = self._scroll_axis(
+                    state.thumb_rx, rs_deadzone, scroll_cfg.get("horizontal_speed", 15.0), dt, self._scroll_accum_h
+                )
+                if emit:
+                    self.win.scroll_horizontal(emit)
 
     def _process_right_trigger(self, state: GamepadState, schema: Dict[str, Any]):
         triggers_cfg = schema.get("triggers", {})
         if not triggers_cfg.get("rt_left_click", True):
             return
         threshold = triggers_cfg.get("threshold", 0.3)
+        has_layer = bool(schema.get("rt_layer", {}))
+        
         if state.right_trigger > threshold and not self._rt_down:
             self._rt_down = True
-            self.actions.execute_press("left_click", source="rt")
+            self._rt_layer_used = False
+            if not has_layer:
+                self.actions.execute_press("left_click", source="rt")
         elif state.right_trigger <= threshold - 0.08 and self._rt_down:
             self._rt_down = False
-            self.actions.execute_release("left_click", source="rt")
+            if not has_layer:
+                self.actions.execute_release("left_click", source="rt")
+            elif not getattr(self, "_rt_layer_used", False):
+                self.actions.tap("left_click", source="rt")
 
     def _process_left_trigger(self, state: GamepadState, schema: Dict[str, Any]):
         triggers_cfg = schema.get("triggers", {})
@@ -296,16 +355,22 @@ class InputMapper:
         if triggers_cfg.get("lt_precision_aim", True) and not action:
             return
         threshold = triggers_cfg.get("threshold", 0.3)
+        has_layer = bool(schema.get("lt_layer", {}))
+        
         if state.left_trigger > threshold and not self._lt_down:
             self._lt_down = True
-            if action:
+            self._lt_layer_used = False
+            if action and not has_layer:
                 self._active_action["lt"] = action
                 self.actions.execute_press(action, source="lt")
         elif state.left_trigger <= threshold - 0.08 and self._lt_down:
             self._lt_down = False
-            prev_action = self._active_action.pop("lt", None)
-            if prev_action:
-                self.actions.execute_release(prev_action, source="lt")
+            if action and not has_layer:
+                prev_action = self._active_action.pop("lt", None)
+                if prev_action:
+                    self.actions.execute_release(prev_action, source="lt")
+            elif action and has_layer and not getattr(self, "_lt_layer_used", False):
+                self.actions.tap(action, source="lt")
 
     def _process_buttons(self, state: GamepadState, now: float, combo_enabled: bool, schema: Dict[str, Any]):
         buttons_cfg = schema.get("buttons", {})
@@ -333,25 +398,33 @@ class InputMapper:
             "paddle2": getattr(state, 'paddle2', False),
             "paddle3": getattr(state, 'paddle3', False),
             "paddle4": getattr(state, 'paddle4', False),
+            "agl": getattr(state, 'agl', False),
+            "agr": getattr(state, 'agr', False),
         }
 
         for name, is_down in current_buttons.items():
             was_down = self._button_states.get(name, False)
             self._button_states[name] = is_down
 
-            if combo_enabled and name in COMBO_BUTTONS:
-                action = buttons_cfg.get(name)
-                if (action and action not in MODIFIER_ACTIONS and was_down and not is_down
-                        and not self._combo_consumed):
-                    self.actions.tap(action, source=name)
-                continue
-
+            is_double_tap = False
             if is_down and not was_down:
                 if not hasattr(self, "_last_press_times"):
                     self._last_press_times = {}
-                last_press = self._last_press_times.get(name, 0.0)
+                last_press = self._last_press_times.get(name, -100.0)
                 self._last_press_times[name] = now
                 is_double_tap = (now - last_press) < 0.35
+
+            if combo_enabled and name in COMBO_BUTTONS:
+                if is_down and not was_down and is_double_tap and name in double_clicks:
+                    self._combo_consumed = True
+                    self.actions.tap(double_clicks[name], source=name)
+                elif was_down and not is_down:
+                    action = buttons_cfg.get(name)
+                    if (action and action not in MODIFIER_ACTIONS and not self._combo_consumed):
+                        self.actions.tap(action, source=name)
+                continue
+
+            if is_down and not was_down:
 
                 app_profiles = self.config.get("app_profiles", {})
                 active_proc = getattr(self, "_active_proc", "")
@@ -366,10 +439,12 @@ class InputMapper:
                 elif state.back and name in back_layer:
                     action = back_layer[name]
                     self._combo_consumed = True  # Back was used as a modifier
-                elif state.left_trigger > 0.3 and name in lt_layer:
+                elif state.left_trigger > schema.get("triggers", {}).get("threshold", 0.3) and name in lt_layer:
                     action = lt_layer[name]
-                elif state.right_trigger > 0.3 and name in rt_layer:
+                    self._lt_layer_used = True
+                elif state.right_trigger > schema.get("triggers", {}).get("threshold", 0.3) and name in rt_layer:
                     action = rt_layer[name]
+                    self._rt_layer_used = True
                 elif active_proc in app_profiles and name in app_profiles[active_proc]:
                     action = app_profiles[active_proc][name]
                 else:

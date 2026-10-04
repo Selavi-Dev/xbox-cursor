@@ -208,17 +208,23 @@ class ControllerAppGUI:
         self.hud['guide_line'] = cv.create_line(cx, cy - 135, cx, cy - 175, fill="#3f3f46", width=2)
         self.hud['guide_callout'] = cv.create_text(cx, cy - 185, text="Xbox Controller Active", fill="#52525b", font=("Segoe UI", 10), justify="center")
 
-        # Map components: name, label, x, y, callout_end_x, callout_end_y, text_anchor, callout_text
-        self._add_button("a", "A", cx + 120, cy - 20, cx + 290, cy - 5, "w", "Left Click")
-        self._add_button("b", "B", cx + 150, cy - 50, cx + 290, cy - 35, "w", "Escape (Back)")
-        self._add_button("x", "X", cx + 90, cy - 50, cx + 290, cy - 65, "w", "Right Click")
-        self._add_button("y", "Y", cx + 120, cy - 80, cx + 290, cy - 95, "w", "Voice Dictation")
-
-        self._add_button("lb", "LB", cx - 130, cy - 135, cx - 290, cy - 135, "e", "Browser Back")
-        self._add_button("rb", "RB", cx + 130, cy - 135, cx + 290, cy - 135, "w", "Browser Forward")
+        # Map components dynamically based on current config
+        btn_cfg = self.mapper.config.get("schemas", {}).get("desktop", {}).get("buttons", {})
         
-        self._add_button("back", "Back", cx - 50, cy - 60, cx - 290, cy - 180, "e", "Alt + Tab / Modifier")
-        self._add_button("start", "Start", cx + 50, cy - 60, cx + 290, cy - 180, "w", "Windows Menu")
+        def _get_callout(btn: str, fallback: str) -> str:
+            action = btn_cfg.get(btn)
+            return action.replace("_", " ").title() if action else fallback
+
+        self._add_button("a", "A", cx + 120, cy - 20, cx + 290, cy - 5, "w", _get_callout("a", "Left Click"))
+        self._add_button("b", "B", cx + 150, cy - 50, cx + 290, cy - 35, "w", _get_callout("b", "Right Click"))
+        self._add_button("x", "X", cx + 90, cy - 50, cx + 290, cy - 65, "w", _get_callout("x", "Enter"))
+        self._add_button("y", "Y", cx + 120, cy - 80, cx + 290, cy - 95, "w", _get_callout("y", "Voice Dictation"))
+
+        self._add_button("lb", "LB", cx - 130, cy - 135, cx - 290, cy - 135, "e", _get_callout("lb", "Browser Back"))
+        self._add_button("rb", "RB", cx + 130, cy - 135, cx + 290, cy - 135, "w", _get_callout("rb", "Browser Forward"))
+        
+        self._add_button("back", "Back", cx - 50, cy - 60, cx - 290, cy - 180, "e", _get_callout("back", "Alt + Tab / Modifier"))
+        self._add_button("start", "Start", cx + 50, cy - 60, cx + 290, cy - 180, "w", _get_callout("start", "Windows Menu"))
 
         # D-Pad
         dpad_x, dpad_y = cx - 70, cy + 50
@@ -226,14 +232,32 @@ class ControllerAppGUI:
         
         # Sticks
         ls_x, ls_y = cx - 120, cy - 50
-        self._add_stick("ls", ls_x, ls_y, cx - 290, cy + 20, "e", "Move Cursor\n(Click: Play/Pause)")
+        ls_click_act = _get_callout("ls_click", "Play/Pause")
+        self._add_stick("ls", ls_x, ls_y, cx - 290, cy + 20, "e", f"Move Cursor\n(Click: {ls_click_act})")
         
         rs_x, rs_y = cx + 70, cy + 50
-        self._add_stick("rs", rs_x, rs_y, cx + 290, cy + 50, "w", "Scroll Wheel\n(Click: Middle Click)")
+        rs_click_act = _get_callout("rs_click", "Middle Click")
+        self._add_stick("rs", rs_x, rs_y, cx + 290, cy + 50, "w", f"Scroll Wheel\n(Click: {rs_click_act})")
 
-        # Triggers
-        self._add_trigger("lt", cx - 130, cy - 165, cx - 290, cy - 105, "e", "Precision Aim (Slow)")
-        self._add_trigger("rt", cx + 130, cy - 165, cx + 290, cy - 105, "w", "Left Click (Drag)")
+        # Triggers (callouts follow current desktop schema)
+        triggers_cfg = self.mapper.config.get("schemas", {}).get("desktop", {}).get("triggers", {})
+        lt_action = triggers_cfg.get("lt_action")
+        if triggers_cfg.get("lt_precision_aim", False) and not lt_action:
+            lt_callout = "Precision Aim (Slow)"
+        elif lt_action:
+            lt_callout = lt_action.replace("_", " ").title()
+        else:
+            lt_callout = "Left Trigger"
+        rt_callout = "Left Click (Drag)" if triggers_cfg.get("rt_left_click", True) else "Right Trigger"
+        self._add_trigger("lt", cx - 130, cy - 165, cx - 290, cy - 105, "e", lt_callout)
+        self._add_trigger("rt", cx + 130, cy - 165, cx + 290, cy - 105, "w", rt_callout)
+        
+        # Sidewings (AGL / AGR)
+        if self.mapper.config.get("features", {}).get("discrete_paddles", False):
+            agl_pts = [cx - 215, cy + 30, cx - 245, cy + 60, cx - 245, cy + 90, cx - 200, cy + 120]
+            agr_pts = [cx + 215, cy + 30, cx + 245, cy + 60, cx + 245, cy + 90, cx + 200, cy + 120]
+            self._add_sidewing("agl", agl_pts, cx - 290, cy + 100, "e", _get_callout("agl", "Desktop Left"))
+            self._add_sidewing("agr", agr_pts, cx + 290, cy + 100, "w", _get_callout("agr", "Desktop Right"))
         
         # Central Game Mode combo hint
         cv.create_text(cx, cy + 140, text="Hold Back + Start for 1.2s to toggle Game Mode", fill="#52525b", font=("Segoe UI", 10, "italic"))
@@ -286,21 +310,34 @@ class ControllerAppGUI:
         self.hud[f'base_x_{name}'] = x
         self.hud[f'base_y_{name}'] = y
 
+    def _add_sidewing(self, name, x_pts, tx, ty, anchor, callout):
+        bg = self.cv.create_polygon(x_pts, smooth=True, fill="#27272a", outline="#52525b", width=1.5)
+        mid_x = sum(x_pts[0::2]) / (len(x_pts) // 2)
+        mid_y = sum(x_pts[1::2]) / (len(x_pts) // 2)
+        line = self.cv.create_line(mid_x, mid_y, tx, ty, fill="#3f3f46", width=2)
+        lbl = self.cv.create_text(tx + (10 if anchor=="w" else -10), ty, text=callout, fill="#a1a1aa", anchor=anchor, font=("Segoe UI", 10))
+        
+        self.hud[f'btn_{name}'] = bg
+        self.hud[f'line_{name}'] = line
+        self.hud[f'lbl_{name}'] = lbl
+        self.hud[f'txt_{name}'] = self.cv.create_text(-1000, -1000, text="")
+
     # -------------------------------------------------------------------------
     # MAPPING TAB
     # -------------------------------------------------------------------------
     def _load_schema_mappings(self):
-        schema_name = "gaming" if (getattr(self, "_last_auto_paused", False) or not self._is_enabled) else "desktop"
+        # Game Mode is pure pass-through; only the desktop schema is editable.
+        schema_name = "desktop"
         self._current_mapping_schema_name = schema_name
-        
+
         if hasattr(self, "mapping_title_lbl"):
-            self.mapping_title_lbl.config(text=f"{schema_name.capitalize()} Button Mapping")
-            
+            self.mapping_title_lbl.config(text="Desktop Button Mapping")
+
         cfg = self.mapper.config.get("schemas", {}).get(schema_name, {})
-        
+
         group_key = getattr(self, "_mapping_groups", {}).get(getattr(self, "mapping_group_var", tk.StringVar(value="Base Buttons")).get(), "buttons")
         buttons_cfg = cfg.get(group_key, {})
-        
+
         if hasattr(self, "mapping_vars"):
             for btn, var in self.mapping_vars.items():
                 internal_val = buttons_cfg.get(btn, "")
@@ -343,6 +380,8 @@ class ControllerAppGUI:
             "dpad_up", "dpad_down", "dpad_left", "dpad_right", 
             "start", "back"
         ]
+        if self.mapper.config.get("features", {}).get("discrete_paddles", False):
+            buttons_list.extend(["agl", "agr"])
         
         actions_list = [
             "", "left_click", "right_click", "middle_click",
@@ -362,14 +401,15 @@ class ControllerAppGUI:
             "ls_click": "Left Stick Click", "rs_click": "Right Stick Click",
             "dpad_up": "D-Pad Up", "dpad_down": "D-Pad Down", 
             "dpad_left": "D-Pad Left", "dpad_right": "D-Pad Right",
-            "start": "Start (Menu)", "back": "Back (View)"
+            "start": "Start (Menu)", "back": "Back (View)",
+            "agl": "AGL (Left Grip)", "agr": "AGR (Right Grip)"
         }
         
         display_actions = [a.replace("_", " ").title() for a in actions_list]
         
         for i, btn in enumerate(buttons_list):
-            row = i % 7
-            col = i // 7 * 2
+            row = i % 8
+            col = (i // 8) * 2
             
             friendly_name = friendly_btn_names.get(btn, btn.upper())
             lbl = tk.Label(grid_frame, text=friendly_name + ": ", font=("Segoe UI", 11, "bold"), bg="#27272a", fg="#f4f4f5", width=16, anchor="e")
@@ -406,8 +446,8 @@ class ControllerAppGUI:
         mouse_cfg = desktop_cfg.get("mouse", {})
         scroll_cfg = desktop_cfg.get("scroll", {})
 
-        self.speed_var = tk.DoubleVar(value=mouse_cfg.get("base_speed", 22.0))
-        self._create_slider(container, "Cursor Base Speed:", self.speed_var, 5.0, 50.0, 1.0, "pixels/tick")
+        self.speed_var = tk.DoubleVar(value=mouse_cfg.get("base_speed", 5.0))
+        self._create_slider(container, "Cursor Base Speed:", self.speed_var, 1.0, 30.0, 0.5, "pixels/tick")
 
         self.exp_var = tk.DoubleVar(value=mouse_cfg.get("acceleration_exponent", 1.85))
         self._create_slider(container, "Acceleration Exponent (Curve):", self.exp_var, 1.0, 3.0, 0.05, "power")
@@ -493,12 +533,6 @@ class ControllerAppGUI:
             messagebox.showerror("Registry Error", f"Failed to modify startup registry: {e}")
 
     def _apply_tuning_in_memory(self):
-        schema_name = getattr(self, "_current_mapping_schema_name", "desktop")
-        active_cfg = self.mapper.config.setdefault("schemas", {}).setdefault(schema_name, {})
-        
-        # Only overwrite tuning fields if we are editing the desktop schema (or if we want them globally)
-        # But we actually only track one slider for tuning. Let's just always write tuning to desktop 
-        # or the active schema. Since tuning is mostly for desktop, let's keep it simple:
         desktop_cfg = self.mapper.config.setdefault("schemas", {}).setdefault("desktop", {})
         desktop_cfg.setdefault("mouse", {})
         desktop_cfg["mouse"]["base_speed"] = float(self.speed_var.get())
@@ -508,16 +542,17 @@ class ControllerAppGUI:
 
         desktop_cfg.setdefault("scroll", {})
         desktop_cfg["scroll"]["vertical_speed"] = float(self.scroll_var.get())
-        
-        # Save button mappings to the ACTIVELY VIEWED schema and layer!
+
         if hasattr(self, "mapping_vars"):
-            group_key = getattr(self, "_mapping_groups", {}).get(getattr(self, "mapping_group_var", tk.StringVar(value="Base Buttons")).get(), "buttons")
-            buttons_cfg = active_cfg.setdefault(group_key, {})
+            group_key = getattr(self, "_mapping_groups", {}).get(
+                getattr(self, "mapping_group_var", tk.StringVar(value="Base Buttons")).get(),
+                "buttons",
+            )
+            buttons_cfg = desktop_cfg.setdefault(group_key, {})
             for btn, var in self.mapping_vars.items():
                 display_val = var.get().strip()
                 if display_val:
-                    internal_val = display_val.lower().replace(" ", "_")
-                    buttons_cfg[btn] = internal_val
+                    buttons_cfg[btn] = display_val.lower().replace(" ", "_")
                 else:
                     buttons_cfg.pop(btn, None)
 
@@ -581,6 +616,9 @@ class ControllerAppGUI:
     # DYNAMIC RENDER LOOP
     # -------------------------------------------------------------------------
     def _update_btn_visual(self, name: str, is_pressed: bool):
+        # Paddle widgets are only created when discrete_paddles is enabled.
+        if f"btn_{name}" not in self.hud:
+            return
         if is_pressed:
             self.cv.itemconfig(self.hud[f'btn_{name}'], fill="#10b981", outline="#34d399")
             self.cv.itemconfig(self.hud[f'txt_{name}'], fill="#ffffff")
@@ -636,6 +674,8 @@ class ControllerAppGUI:
                 self._update_btn_visual("rb", state.right_shoulder)
                 self._update_btn_visual("start", state.start)
                 self._update_btn_visual("back", state.back)
+                self._update_btn_visual("agl", getattr(state, "agl", False))
+                self._update_btn_visual("agr", getattr(state, "agr", False))
 
                 # D-Pad Cross & Media Layer dynamic callout
                 dpad_active = state.dpad_up or state.dpad_down or state.dpad_left or state.dpad_right
@@ -691,7 +731,8 @@ class ControllerAppGUI:
                     self.cv.itemconfig(self.hud['lbl_rs'], fill="#a1a1aa", font=("Segoe UI", 10))
 
                 # Radial Menu Trigger (Back button)
-                if state.back:
+                schema = self.mapper.get_active_schema()
+                if state.back and schema:
                     self.radial.show()
                     # Feed right stick inverted Y for standard cartesian math
                     self.radial.update_stick(state.thumb_rx, state.thumb_ry)
@@ -703,7 +744,9 @@ class ControllerAppGUI:
                 self.radial.hide()
                 self.conn_label.config(text="🔴 No Xbox controller detected. Plug it in via USB or Wireless.", fg="#ef4444")
 
-        except Exception:
-            pass
+        except Exception as e:
+            if not getattr(self, "_refresh_error_logged", False):
+                self._refresh_error_logged = True
+                print(f"[GUI] Refresh loop error (further errors suppressed): {e!r}")
 
         self.root.after(25, self._refresh_gui_loop)

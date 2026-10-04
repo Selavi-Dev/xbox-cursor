@@ -60,8 +60,8 @@ class ActionManager:
             "media_play_pause": w.media_play_pause,
             "browser_back": w.browser_back,
             "browser_forward": w.browser_forward,
-            "browser_next_tab": lambda: w.send_combo([VK_LWIN, VK_TAB]) if False else w.send_combo([0x11, VK_TAB]), # Ctrl+Tab
-            "browser_prev_tab": lambda: w.send_combo([0x11, 0x10, VK_TAB]), # Ctrl+Shift+Tab
+            "browser_next_tab": lambda: w.send_combo([0x11, VK_TAB]),  # Ctrl+Tab
+            "browser_prev_tab": lambda: w.send_combo([0x11, 0x10, VK_TAB]),  # Ctrl+Shift+Tab
             "show_desktop": w.show_desktop,
             "task_view": w.task_view,
             "toggle_osk": w.toggle_osk,
@@ -87,10 +87,6 @@ class ActionManager:
         }
 
     def _dictation_toggle(self):
-        import time
-        self.win.left_down()
-        self.win.left_up()
-        time.sleep(0.05)
         self.win.send_combo([VK_LWIN, 0x48])
 
     @property
@@ -124,6 +120,9 @@ class ActionManager:
         self.execute_release(action_name, source)
 
     def release_all(self):
-        """Drop every held mouse button regardless of source."""
+        """Drop every held action (mouse and keyboard) regardless of source."""
+        for action_name, holders in list(self._holders.items()):
+            if holders and action_name in self._hold_actions:
+                self._hold_actions[action_name][1]()
         self._holders.clear()
         self.win.release_all_mouse_buttons()

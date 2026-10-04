@@ -12,7 +12,7 @@ from controller.xinput import (
     XINPUT_GAMEPAD_DPAD_UP, XINPUT_GAMEPAD_DPAD_RIGHT,
     XINPUT_GAMEPAD_LEFT_THUMB, XINPUT_GAMEPAD_RIGHT_THUMB,
 )
-from controller.win32_input import VK_ESCAPE, VK_LWIN, VK_UP, VK_MENU, VK_TAB
+from controller.win32_input import VK_ESCAPE, VK_LWIN, VK_UP, VK_MENU, VK_TAB, VK_RETURN, VK_LEFT, VK_RIGHT
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config.json")
 
@@ -29,6 +29,8 @@ class TestDefaultLayout(unittest.TestCase):
         self.win = MagicMock()
         self.m = InputMapper(config, MagicMock(), self.win)
         self.t = 0.0
+        self.m.process_frame(frame(0), now=-2/120)
+        self.m.process_frame(frame(0), now=-1/120)
 
     def tap(self, buttons):
         self.m.process_frame(frame(buttons), now=self.t)
@@ -39,15 +41,15 @@ class TestDefaultLayout(unittest.TestCase):
         self.tap(XINPUT_GAMEPAD_A)
         self.win.left_down.assert_called_once()
         self.tap(XINPUT_GAMEPAD_X)
-        self.win.right_down.assert_called_once()
+        self.win.key_press.assert_called_with(VK_RETURN)
         self.tap(XINPUT_GAMEPAD_B)
-        self.win.key_press.assert_called_with(VK_ESCAPE)
+        self.win.right_down.assert_called_once()
 
     def test_stick_clicks(self):
         self.tap(XINPUT_GAMEPAD_LEFT_THUMB)
-        self.win.media_play_pause.assert_called_once()
+        self.win.send_combo.assert_any_call([0x11, VK_LWIN, VK_LEFT])
         self.tap(XINPUT_GAMEPAD_RIGHT_THUMB)
-        self.win.middle_down.assert_called_once()
+        self.win.send_combo.assert_any_call([0x11, VK_LWIN, VK_RIGHT])
 
     def test_dpad_is_arrows(self):
         self.tap(XINPUT_GAMEPAD_DPAD_UP)
@@ -58,7 +60,7 @@ class TestDefaultLayout(unittest.TestCase):
         self.tap(XINPUT_GAMEPAD_START)
         self.win.key_press.assert_called_with(VK_LWIN)
         self.tap(XINPUT_GAMEPAD_BACK)
-        self.win.send_combo.assert_called_with([VK_MENU, VK_TAB])
+        self.win.send_combo.assert_not_called()
 
     def test_back_layer_media_and_no_alt_tab(self):
         B, U, R = XINPUT_GAMEPAD_BACK, XINPUT_GAMEPAD_DPAD_UP, XINPUT_GAMEPAD_DPAD_RIGHT
