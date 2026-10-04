@@ -24,16 +24,17 @@ Built specifically for high responsiveness (120Hz polling), multi-monitor setups
 
 ```
                  [ LB: Browser Back ]         [ RB: Browser Fwd ]
-                 [ LT: Precision Aim]         [ RT: Left Click  ]
+                 [ LT: Enter (Tap)  ]         [ RT: Left Click  ]
+                  [  + LT Layers    ]          [  + RT Layers   ]
                            \                         /
                             \                       /
-                       (D-Pad)                     (Y) Toggle Keyboard
-             [Up]    Arrow Up                (X)         (B) Escape
-            [Down]   Arrow Down         Right Click
+                       (D-Pad)                     (Y) Voice Dictation
+             [Up]    Arrow Up                (X)         (B) Right Click
+            [Down]   Arrow Down              Enter
             [Left]   Arrow Left                    (A) Left Click
             [Right]  Arrow Right
                                 [Back]     [Start]
-                               Alt+Tab      Win Key
+                              Radial Menu   Win Key
                                      \     /
                          [Hold Back + Start: Game Mode Toggle]
                  (Left Stick)                      (Right Stick)
@@ -46,20 +47,26 @@ Built specifically for high responsiveness (120Hz polling), multi-monitor setups
 | **Left Stick** | Mouse Cursor | Smooth movement (Auto-Turbo at edge) |
 | **Right Stick** | Mouse Wheel | Vertical and horizontal scroll |
 | **Right Trigger (RT)** | Primary Left Click | Pull to click, hold to drag / select text |
+| **Left Trigger (LT)** | Enter | Tap to press Enter, hold for modifiers |
 | **A Button** | Primary Left Click | Standard click |
-| **B Button** | Escape | Back / cancel / close menus |
-| **X Button** | Secondary Right Click | Context menu |
-| **Left Trigger (LT)** | Precision Aim Mode | Slows down cursor by 70% |
-| **Y Button** | On-Screen Keyboard | Couch typing access |
+| **B Button** | Right Click | Context Menu |
+| **X Button** | Enter | Standard enter |
+| **Y Button** | Voice Dictation | Toggles Windows Dictation (Win+H) |
 | **Left Bumper (LB)** | Browser Back | Navigate back |
 | **Right Bumper (RB)** | Browser Forward | Navigate forward |
 | **Left Stick Click (LS)** | Play / Pause | Toggle media playback |
 | **Right Stick Click (RS)**| Middle Click | Open links in new tab / auto-scroll |
 | **D-Pad** | Arrow Keys | Up, Down, Left, Right (auto-repeats) |
 | **Start (Menu)** | Windows Key | Open Start Menu |
-| **Back (View)** | Alt + Tab | Switch active applications |
-| **Hold Back + D-Pad** | Media Layer | Volume Up/Down, Prev/Next track |
-| **Back + Start (Hold 1.2s)** | **Toggle Game Mode** | Pauses/Resumes desktop control |
+| **Back (View)** | Radial Menu Modifier | Hold to show radial menu |
+| **Hold Back + Start (1.2s)** | **Toggle Game Mode** | Pauses desktop control (pass-through) |
+
+### Sidewings (PowerA / 8BitDo / PDP)
+If your controller features physical programmable back buttons (AGL/AGR or Pro Pack paddles) that mirror hardware buttons, you can map them to Desktop Left / Right functionality using this approach:
+1. Program your controller's left paddle to mirror **Left Stick Click (LS)**.
+2. Program your controller's right paddle to mirror **Right Stick Click (RS)**.
+3. The default `config.json` is already set up so `ls_click` maps to `desktop_left` (Win+Ctrl+Left) and `rs_click` to `desktop_right` (Win+Ctrl+Right). Note: `ls_click` may also act as Media Play/Pause by default; feel free to adjust in `config.json` if needed.
+4. *If you have a controller that supports independent discrete paddles in software, set `"discrete_paddles": true` in `config.json` features.*
 
 ---
 
@@ -87,32 +94,25 @@ All sensitivities, curves, and button assignments are stored in [config.json](fi
 
 ```json
 {
-  "mouse": {
-    "base_speed": 22.0,
-    "acceleration_exponent": 1.85,
-    "deadzone": 0.18,
-    "turbo_multiplier": 2.3,
-    "precision_multiplier": 0.28,
-    "poll_rate_hz": 120
-  },
-  "scroll": {
-    "vertical_speed": 4.5,
-    "horizontal_speed": 3.5,
-    "deadzone": 0.22,
-    "horizontal_enabled": true
-  },
-  "triggers": {
-    "rt_left_click": true,
-    "lt_precision_aim": true,
-    "threshold": 0.3
+  "schemas": {
+    "desktop": {
+      "mouse": {
+        "base_speed": 5.0,
+        "acceleration_exponent": 2.0,
+        "deadzone": 0.18,
+        "turbo_multiplier": 2.3,
+        "precision_multiplier": 0.35,
+        "poll_rate_hz": 120
+      }
+    }
   }
 }
 ```
 
 - **`base_speed`**: Maximum cursor speed when the stick is fully pushed.
-- **`acceleration_exponent`**: Exponent of the power curve (\(1.85\) is ideal: subtle tilts move slowly for fine targeting, large tilts move fast).
+- **`acceleration_exponent`**: Exponent of the power curve (\(2.0\) is ideal: subtle tilts move slowly for fine targeting, large tilts move fast).
 - **`deadzone`**: Inner radius where stick input is ignored (prevents controller stick drift).
-- **`precision_multiplier`**: Speed ratio applied when holding `LT` (default `0.28` cuts speed to ~28%).
+- **`precision_multiplier`**: Speed ratio applied when using precision aim or during specific profile states.
 
 ---
 

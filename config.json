@@ -2,11 +2,11 @@
   "schemas": {
     "desktop": {
       "mouse": {
-        "base_speed": 10.0,
-        "acceleration_exponent": 3.0,
-        "deadzone": 0.15,
+        "base_speed": 5.0,
+        "acceleration_exponent": 2.0,
+        "deadzone": 0.18,
         "turbo_multiplier": 2.3,
-        "precision_multiplier": 0.6,
+        "precision_multiplier": 0.35,
         "poll_rate_hz": 120,
         "auto_turbo": {
           "enabled": true,
@@ -32,15 +32,16 @@
         "x": "enter",
         "y": "dictation_toggle",
         "rb": "browser_forward",
-        "ls_click": "media_play_pause",
-        "rs_click": "middle_click",
+        "ls_click": "desktop_left",
+        "rs_click": "desktop_right",
         "dpad_up": "arrow_up",
         "dpad_down": "arrow_down",
         "dpad_left": "arrow_left",
         "dpad_right": "arrow_right",
         "start": "win_key",
         "back": "radial_menu_modifier",
-        "a": "left_click"
+        "a": "left_click",
+        "lb": "browser_back"
       },
       "lt_layer": {
         "a": "copy",
@@ -113,6 +114,7 @@
     "toggle_combo_enabled": true,
     "toggle_hold_seconds": 1.2,
     "rumble_feedback": true,
-    "start_enabled": true
+    "start_enabled": true,
+    "discrete_paddles": false
   }
 }

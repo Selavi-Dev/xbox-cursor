@@ -244,10 +244,11 @@ class ControllerAppGUI:
         self._add_trigger("rt", cx + 130, cy - 165, cx + 290, cy - 105, "w", "Left Click (Drag)")
         
         # Sidewings (AGL / AGR)
-        agl_pts = [cx - 215, cy + 30, cx - 245, cy + 60, cx - 245, cy + 90, cx - 200, cy + 120]
-        agr_pts = [cx + 215, cy + 30, cx + 245, cy + 60, cx + 245, cy + 90, cx + 200, cy + 120]
-        self._add_sidewing("agl", agl_pts, cx - 290, cy + 100, "e", _get_callout("agl", "Desktop Left"))
-        self._add_sidewing("agr", agr_pts, cx + 290, cy + 100, "w", _get_callout("agr", "Desktop Right"))
+        if self.mapper.config.get("features", {}).get("discrete_paddles", False):
+            agl_pts = [cx - 215, cy + 30, cx - 245, cy + 60, cx - 245, cy + 90, cx - 200, cy + 120]
+            agr_pts = [cx + 215, cy + 30, cx + 245, cy + 60, cx + 245, cy + 90, cx + 200, cy + 120]
+            self._add_sidewing("agl", agl_pts, cx - 290, cy + 100, "e", _get_callout("agl", "Desktop Left"))
+            self._add_sidewing("agr", agr_pts, cx + 290, cy + 100, "w", _get_callout("agr", "Desktop Right"))
         
         # Central Game Mode combo hint
         cv.create_text(cx, cy + 140, text="Hold Back + Start for 1.2s to toggle Game Mode", fill="#52525b", font=("Segoe UI", 10, "italic"))
@@ -367,8 +368,10 @@ class ControllerAppGUI:
             "a", "b", "x", "y", 
             "lb", "rb", "ls_click", "rs_click", 
             "dpad_up", "dpad_down", "dpad_left", "dpad_right", 
-            "start", "back", "agl", "agr"
+            "start", "back"
         ]
+        if self.mapper.config.get("features", {}).get("discrete_paddles", False):
+            buttons_list.extend(["agl", "agr"])
         
         actions_list = [
             "", "left_click", "right_click", "middle_click",
