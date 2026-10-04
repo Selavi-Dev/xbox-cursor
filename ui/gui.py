@@ -208,17 +208,23 @@ class ControllerAppGUI:
         self.hud['guide_line'] = cv.create_line(cx, cy - 135, cx, cy - 175, fill="#3f3f46", width=2)
         self.hud['guide_callout'] = cv.create_text(cx, cy - 185, text="Xbox Controller Active", fill="#52525b", font=("Segoe UI", 10), justify="center")
 
-        # Map components: name, label, x, y, callout_end_x, callout_end_y, text_anchor, callout_text
-        self._add_button("a", "A", cx + 120, cy - 20, cx + 290, cy - 5, "w", "Left Click")
-        self._add_button("b", "B", cx + 150, cy - 50, cx + 290, cy - 35, "w", "Escape (Back)")
-        self._add_button("x", "X", cx + 90, cy - 50, cx + 290, cy - 65, "w", "Right Click")
-        self._add_button("y", "Y", cx + 120, cy - 80, cx + 290, cy - 95, "w", "Voice Dictation")
-
-        self._add_button("lb", "LB", cx - 130, cy - 135, cx - 290, cy - 135, "e", "Browser Back")
-        self._add_button("rb", "RB", cx + 130, cy - 135, cx + 290, cy - 135, "w", "Browser Forward")
+        # Map components dynamically based on current config
+        btn_cfg = self.mapper.config.get("schemas", {}).get("desktop", {}).get("buttons", {})
         
-        self._add_button("back", "Back", cx - 50, cy - 60, cx - 290, cy - 180, "e", "Alt + Tab / Modifier")
-        self._add_button("start", "Start", cx + 50, cy - 60, cx + 290, cy - 180, "w", "Windows Menu")
+        def _get_callout(btn: str, fallback: str) -> str:
+            action = btn_cfg.get(btn)
+            return action.replace("_", " ").title() if action else fallback
+
+        self._add_button("a", "A", cx + 120, cy - 20, cx + 290, cy - 5, "w", _get_callout("a", "Left Click"))
+        self._add_button("b", "B", cx + 150, cy - 50, cx + 290, cy - 35, "w", _get_callout("b", "Right Click"))
+        self._add_button("x", "X", cx + 90, cy - 50, cx + 290, cy - 65, "w", _get_callout("x", "Enter"))
+        self._add_button("y", "Y", cx + 120, cy - 80, cx + 290, cy - 95, "w", _get_callout("y", "Voice Dictation"))
+
+        self._add_button("lb", "LB", cx - 130, cy - 135, cx - 290, cy - 135, "e", _get_callout("lb", "Browser Back"))
+        self._add_button("rb", "RB", cx + 130, cy - 135, cx + 290, cy - 135, "w", _get_callout("rb", "Browser Forward"))
+        
+        self._add_button("back", "Back", cx - 50, cy - 60, cx - 290, cy - 180, "e", _get_callout("back", "Alt + Tab / Modifier"))
+        self._add_button("start", "Start", cx + 50, cy - 60, cx + 290, cy - 180, "w", _get_callout("start", "Windows Menu"))
 
         # D-Pad
         dpad_x, dpad_y = cx - 70, cy + 50
@@ -226,10 +232,12 @@ class ControllerAppGUI:
         
         # Sticks
         ls_x, ls_y = cx - 120, cy - 50
-        self._add_stick("ls", ls_x, ls_y, cx - 290, cy + 20, "e", "Move Cursor\n(Click: Play/Pause)")
+        ls_click_act = _get_callout("ls_click", "Play/Pause")
+        self._add_stick("ls", ls_x, ls_y, cx - 290, cy + 20, "e", f"Move Cursor\n(Click: {ls_click_act})")
         
         rs_x, rs_y = cx + 70, cy + 50
-        self._add_stick("rs", rs_x, rs_y, cx + 290, cy + 50, "w", "Scroll Wheel\n(Click: Middle Click)")
+        rs_click_act = _get_callout("rs_click", "Middle Click")
+        self._add_stick("rs", rs_x, rs_y, cx + 290, cy + 50, "w", f"Scroll Wheel\n(Click: {rs_click_act})")
 
         # Triggers
         self._add_trigger("lt", cx - 130, cy - 165, cx - 290, cy - 105, "e", "Precision Aim (Slow)")
@@ -238,8 +246,8 @@ class ControllerAppGUI:
         # Sidewings (AGL / AGR)
         agl_pts = [cx - 215, cy + 30, cx - 245, cy + 60, cx - 245, cy + 90, cx - 200, cy + 120]
         agr_pts = [cx + 215, cy + 30, cx + 245, cy + 60, cx + 245, cy + 90, cx + 200, cy + 120]
-        self._add_sidewing("agl", agl_pts, cx - 290, cy + 100, "e", "Desktop Left")
-        self._add_sidewing("agr", agr_pts, cx + 290, cy + 100, "w", "Desktop Right")
+        self._add_sidewing("agl", agl_pts, cx - 290, cy + 100, "e", _get_callout("agl", "Desktop Left"))
+        self._add_sidewing("agr", agr_pts, cx + 290, cy + 100, "w", _get_callout("agr", "Desktop Right"))
         
         # Central Game Mode combo hint
         cv.create_text(cx, cy + 140, text="Hold Back + Start for 1.2s to toggle Game Mode", fill="#52525b", font=("Segoe UI", 10, "italic"))

@@ -39,9 +39,9 @@ class TestDefaultLayout(unittest.TestCase):
         self.tap(XINPUT_GAMEPAD_A)
         self.win.left_down.assert_called_once()
         self.tap(XINPUT_GAMEPAD_X)
-        self.win.right_down.assert_called_once()
+        self.win.key_press.assert_called_with(VK_RETURN)
         self.tap(XINPUT_GAMEPAD_B)
-        self.win.key_press.assert_called_with(VK_ESCAPE)
+        self.win.right_down.assert_called_once()
 
     def test_stick_clicks(self):
         self.tap(XINPUT_GAMEPAD_LEFT_THUMB)
@@ -58,7 +58,7 @@ class TestDefaultLayout(unittest.TestCase):
         self.tap(XINPUT_GAMEPAD_START)
         self.win.key_press.assert_called_with(VK_LWIN)
         self.tap(XINPUT_GAMEPAD_BACK)
-        self.win.send_combo.assert_called_with([VK_MENU, VK_TAB])
+        self.win.send_combo.assert_not_called()
 
     def test_back_layer_media_and_no_alt_tab(self):
         B, U, R = XINPUT_GAMEPAD_BACK, XINPUT_GAMEPAD_DPAD_UP, XINPUT_GAMEPAD_DPAD_RIGHT
