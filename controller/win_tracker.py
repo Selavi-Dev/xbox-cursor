@@ -3,14 +3,13 @@
 import ctypes
 from ctypes import wintypes
 from typing import Tuple, Optional
+import os
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
-psapi = ctypes.windll.psapi
 
 # Constants
-PROCESS_QUERY_INFORMATION = 0x0400
-PROCESS_VM_READ = 0x0010
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 MONITOR_DEFAULTTONEAREST = 2
 
 class MONITORINFO(ctypes.Structure):
@@ -20,6 +19,18 @@ class MONITORINFO(ctypes.Structure):
         ("rcWork", wintypes.RECT),
         ("dwFlags", wintypes.DWORD)
     ]
+
+# 64-bit safe signatures
+user32.GetForegroundWindow.restype = wintypes.HWND
+user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+kernel32.OpenProcess.restype = wintypes.HANDLE
+kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+kernel32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+user32.MonitorFromWindow.restype = wintypes.HMONITOR
+user32.GetMonitorInfoW.argtypes = [wintypes.HMONITOR, ctypes.POINTER(MONITORINFO)]
 
 def get_active_window_info() -> Tuple[str, bool]:
     """
@@ -35,16 +46,21 @@ def get_active_window_info() -> Tuple[str, bool]:
     pid = wintypes.DWORD()
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     
-    h_process = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid)
+    h_process = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     proc_name = ""
     if h_process:
-        buffer = ctypes.create_unicode_buffer(260)
-        if psapi.GetModuleBaseNameW(h_process, None, buffer, 260):
-            proc_name = buffer.value.lower()
+        buffer = ctypes.create_unicode_buffer(1024)
+        size = wintypes.DWORD(1024)
+        if kernel32.QueryFullProcessImageNameW(h_process, 0, buffer, ctypes.byref(size)):
+            proc_name = os.path.basename(buffer.value).lower()
         kernel32.CloseHandle(h_process)
 
-    # Ignore desktop and shell overlays
-    if proc_name in ["explorer.exe", "searchapp.exe", "shellexperiencehost.exe"]:
+    # Ignore desktop, shell overlays, browsers, and media players for fullscreen detection
+    ignore_list = [
+        "explorer.exe", "searchapp.exe", "shellexperiencehost.exe",
+        "chrome.exe", "msedge.exe", "firefox.exe", "vlc.exe", "mpc-hc64.exe"
+    ]
+    if proc_name in ignore_list:
         return proc_name, False
 
     # Check Fullscreen
