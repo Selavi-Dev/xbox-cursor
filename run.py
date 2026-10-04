@@ -46,6 +46,8 @@ class ControllerService:
     def stop(self):
         self.running = False
         self.mapper.actions.release_all()
+        if self.worker_thread and self.worker_thread.is_alive():
+            self.worker_thread.join(timeout=1.0)
 
     def _poll_loop(self):
         """High-frequency polling loop (120Hz default)."""

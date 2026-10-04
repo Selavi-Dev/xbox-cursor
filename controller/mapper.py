@@ -78,19 +78,28 @@ class InputMapper:
     def set_connected(self, connected: bool):
         self.connected = connected
         if not connected:
-            self.actions.release_all()
-            self._rt_down = False
-            self._button_states.clear()
-            self._repeat_next.clear()
+            self._reset_input_state()
             self._last_frame_time = None
-            self._scroll_accum_v = self._scroll_accum_h = 0.0
+
+    def _reset_input_state(self):
+        """Reset all tracked state to prevent stuck keys and phantom inputs."""
+        self.actions.release_all()
+        self._rt_down = False
+        self._lt_down = False
+        self._button_states.clear()
+        self._repeat_next.clear()
+        self._active_action.clear()
+        if hasattr(self, "_wasd_state"):
+            self._wasd_state.clear()
+        self._combo_start_time = None
+        self._combo_triggered = False
+        self._combo_consumed = False
+        self._scroll_accum_v = self._scroll_accum_h = 0.0
 
     def toggle_enabled(self) -> bool:
         """Toggle desktop control mode on/off."""
         self.is_enabled = not self.is_enabled
-        self.actions.release_all()
-        self._repeat_next.clear()
-        self._scroll_accum_v = self._scroll_accum_h = 0.0
+        self._reset_input_state()
         rumble = self.config.get("features", {}).get("rumble_feedback", True)
 
         if rumble:
@@ -195,6 +204,13 @@ class InputMapper:
 
         # Core Routing: We always process input, but we route it to the active schema!
         schema = self.get_active_schema()
+        
+        # Reset input state if the schema changed (e.g. via auto-pause)
+        old_schema_id = id(getattr(self, "_last_schema", None))
+        if id(schema) != old_schema_id:
+            self._reset_input_state()
+            self._last_schema = schema
+
         self._process_motion(state, dt, now, schema)
         self._process_right_trigger(state, schema)
         self._process_left_trigger(state, schema)
@@ -260,7 +276,7 @@ class InputMapper:
                 mouse_cfg.get("acceleration_exponent", 1.85),
             )
             if cx != 0.0 or cy != 0.0:
-                speed = mouse_cfg.get("base_speed", 22.0) * speed_multiplier * tick_scale
+                speed = mouse_cfg.get("base_speed", 5.0) * speed_multiplier * tick_scale
                 self.win.move_cursor_delta(cx * speed, -cy * speed)
 
         # Right stick scroll
@@ -333,6 +349,8 @@ class InputMapper:
             "paddle2": getattr(state, 'paddle2', False),
             "paddle3": getattr(state, 'paddle3', False),
             "paddle4": getattr(state, 'paddle4', False),
+            "agl": getattr(state, 'agl', False),
+            "agr": getattr(state, 'agr', False),
         }
 
         for name, is_down in current_buttons.items():

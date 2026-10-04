@@ -124,6 +124,9 @@ class ActionManager:
         self.execute_release(action_name, source)
 
     def release_all(self):
-        """Drop every held mouse button regardless of source."""
+        """Drop every held action (mouse and keyboard) regardless of source."""
+        for action_name, holders in list(self._holders.items()):
+            if holders and action_name in self._hold_actions:
+                self._hold_actions[action_name][1]()
         self._holders.clear()
         self.win.release_all_mouse_buttons()
