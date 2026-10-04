@@ -385,19 +385,25 @@ class InputMapper:
             was_down = self._button_states.get(name, False)
             self._button_states[name] = is_down
 
-            if combo_enabled and name in COMBO_BUTTONS:
-                action = buttons_cfg.get(name)
-                if (action and action not in MODIFIER_ACTIONS and was_down and not is_down
-                        and not self._combo_consumed):
-                    self.actions.tap(action, source=name)
-                continue
-
+            is_double_tap = False
             if is_down and not was_down:
                 if not hasattr(self, "_last_press_times"):
                     self._last_press_times = {}
                 last_press = self._last_press_times.get(name, 0.0)
                 self._last_press_times[name] = now
                 is_double_tap = (now - last_press) < 0.35
+
+            if combo_enabled and name in COMBO_BUTTONS:
+                if is_down and not was_down and is_double_tap and name in double_clicks:
+                    self._combo_consumed = True
+                    self.actions.tap(double_clicks[name], source=name)
+                elif was_down and not is_down:
+                    action = buttons_cfg.get(name)
+                    if (action and action not in MODIFIER_ACTIONS and not self._combo_consumed):
+                        self.actions.tap(action, source=name)
+                continue
+
+            if is_down and not was_down:
 
                 app_profiles = self.config.get("app_profiles", {})
                 active_proc = getattr(self, "_active_proc", "")
