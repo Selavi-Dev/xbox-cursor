@@ -2,11 +2,11 @@
   "schemas": {
     "desktop": {
       "mouse": {
-        "base_speed": 5.0,
+        "base_speed": 6.0,
         "acceleration_exponent": 2.0,
         "deadzone": 0.18,
         "turbo_multiplier": 2.3,
-        "precision_multiplier": 0.35,
+        "precision_multiplier": 0.34,
         "poll_rate_hz": 120,
         "auto_turbo": {
           "enabled": true,
@@ -42,22 +42,23 @@
         "back": "radial_menu_modifier",
         "a": "left_click",
         "lb": "browser_back",
-        "lt": "enter",
-        "rt": "left_click"
+        "lt": "left_click",
+        "rt": "backspace"
       },
       "lt_layer": {
         "a": "copy",
         "b": "paste",
-        "x": "undo",
-        "y": "save",
-        "rb": "desktop_right"
+        "x": "save",
+        "y": "undo",
+        "rb": "browser_next_tab"
       },
       "rt_layer": {
-        "lb": "desktop_left"
+        "lb": "browser_prev_tab"
       },
       "double_clicks": {
         "back": "task_view",
-        "b": "backspace"
+        "lb": "browser_prev_tab",
+        "rb": "browser_next_tab"
       }
     }
   },
