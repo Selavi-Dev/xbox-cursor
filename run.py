@@ -138,6 +138,10 @@ def run_gui_mode(service: ControllerService):
 
 
 def main():
+    # Must run before Tk or any Win32 screen metrics are queried.
+    from controller.win32_input import enable_dpi_awareness
+    enable_dpi_awareness()
+
     parser = argparse.ArgumentParser(description="Xbox Controller Desktop Navigator")
     parser.add_argument("--cli", action="store_true", help="Run in headless console mode without GUI")
     parser.add_argument("--config", default="config.json", help="Path to config.json file")

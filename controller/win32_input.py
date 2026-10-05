@@ -1,6 +1,7 @@
 """Windows SendInput and Cursor Management API wrapper using ctypes."""
 
 import ctypes
+import time
 from ctypes import wintypes
 from typing import Tuple, List
 
@@ -136,6 +137,10 @@ class INPUT(ctypes.Structure):
 class Win32Input:
     """Provides high performance cursor positioning and synthetic input for Windows."""
 
+    # Re-query virtual desktop often enough to pick up hot-plugged monitors /
+    # arrangement changes without calling GetSystemMetrics every poll tick.
+    _BOUNDS_REFRESH_INTERVAL_S = 1.0
+
     def __init__(self):
         enable_dpi_awareness()
 
@@ -148,7 +153,8 @@ class Win32Input:
         self._user32.SetCursorPos.restype = wintypes.BOOL
 
         # Multi-monitor bounds
-        self.update_screen_bounds()
+        self._bounds_checked_at = 0.0
+        self.update_screen_bounds(force=True)
 
         # Sub-pixel accumulator
         cur_pos = self.get_cursor_pos()
@@ -162,12 +168,21 @@ class Win32Input:
         self._right_down = False
         self._middle_down = False
 
-    def update_screen_bounds(self):
-        """Query multi-monitor bounding box."""
+    def update_screen_bounds(self, force: bool = False):
+        """Query multi-monitor virtual-desktop bounding box."""
+        now = time.perf_counter()
+        if not force and (now - self._bounds_checked_at) < self._BOUNDS_REFRESH_INTERVAL_S:
+            return
+        self._bounds_checked_at = now
         self.vx = self._user32.GetSystemMetrics(SM_XVIRTUALSCREEN)
         self.vy = self._user32.GetSystemMetrics(SM_YVIRTUALSCREEN)
         self.vw = self._user32.GetSystemMetrics(SM_CXVIRTUALSCREEN)
         self.vh = self._user32.GetSystemMetrics(SM_CYVIRTUALSCREEN)
+        # Guard against transient 0x0 metrics during display reconfiguration.
+        if self.vw <= 0 or self.vh <= 0:
+            self.vx, self.vy = 0, 0
+            self.vw = self._user32.GetSystemMetrics(0) or 1920  # SM_CXSCREEN
+            self.vh = self._user32.GetSystemMetrics(1) or 1080  # SM_CYSCREEN
         self.max_x = self.vx + self.vw - 1
         self.max_y = self.vy + self.vh - 1
 
@@ -178,9 +193,12 @@ class Win32Input:
 
     def move_cursor_delta(self, dx: float, dy: float):
         """Apply fractional pixel delta with sub-pixel accumulator."""
+        self.update_screen_bounds()
         cur_x, cur_y = self.get_cursor_pos()
 
-        # If user moved physical mouse or cursor jumped externally, resync
+        # If user moved physical mouse or cursor jumped externally, resync.
+        # Keep this threshold modest so a failed cross-monitor SetCursorPos
+        # (clipped to an edge) cannot permanently pin the accumulator.
         if abs(cur_x - self._last_raw_x) > 3 or abs(cur_y - self._last_raw_y) > 3:
             self._pos_x = float(cur_x)
             self._pos_y = float(cur_y)
@@ -188,7 +206,7 @@ class Win32Input:
         self._pos_x += dx
         self._pos_y += dy
 
-        # Clamp within virtual desktop monitors
+        # Clamp within the full virtual desktop (all monitors), not primary only.
         self._pos_x = max(float(self.vx), min(float(self.max_x), self._pos_x))
         self._pos_y = max(float(self.vy), min(float(self.max_y), self._pos_y))
 
@@ -197,8 +215,15 @@ class Win32Input:
 
         if new_x != cur_x or new_y != cur_y:
             self._user32.SetCursorPos(new_x, new_y)
-            self._last_raw_x = new_x
-            self._last_raw_y = new_y
+            # Read back — Windows may clip to a real monitor edge inside the
+            # virtual rect (non-rectangular arrangements). Only snap the
+            # accumulator when clipped so sub-pixel motion stays smooth.
+            actual_x, actual_y = self.get_cursor_pos()
+            self._last_raw_x = actual_x
+            self._last_raw_y = actual_y
+            if actual_x != new_x or actual_y != new_y:
+                self._pos_x = float(actual_x)
+                self._pos_y = float(actual_y)
 
     # ------------------------------------------------------------------ low level
     def _send(self, inputs: List[INPUT]):

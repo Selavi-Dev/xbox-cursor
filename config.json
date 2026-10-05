@@ -41,7 +41,9 @@
         "start": "win_key",
         "back": "radial_menu_modifier",
         "a": "left_click",
-        "lb": "browser_back"
+        "lb": "browser_back",
+        "lt": "enter",
+        "rt": "left_click"
       },
       "lt_layer": {
         "a": "copy",

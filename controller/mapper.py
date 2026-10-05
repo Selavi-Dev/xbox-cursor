@@ -330,33 +330,52 @@ class InputMapper:
                 if emit:
                     self.win.scroll_horizontal(emit)
 
-    def _process_right_trigger(self, state: GamepadState, schema: Dict[str, Any]):
+    @staticmethod
+    def _base_trigger_action(schema: Dict[str, Any], trigger: str) -> Optional[str]:
+        """Resolve LT/RT click action from Base buttons.
+
+        - Key present (including "") → that value; empty means explicitly unmapped.
+        - Key absent → legacy fallback from triggers.* for older configs.
+        """
+        buttons_cfg = schema.get("buttons", {})
         triggers_cfg = schema.get("triggers", {})
-        if not triggers_cfg.get("rt_left_click", True):
-            return
-        threshold = triggers_cfg.get("threshold", 0.3)
+        if trigger in buttons_cfg:
+            return buttons_cfg.get(trigger) or None
+        if trigger == "lt":
+            return triggers_cfg.get("lt_action") or None
+        if trigger == "rt":
+            return "left_click" if triggers_cfg.get("rt_left_click", True) else None
+        return None
+
+    def _process_right_trigger(self, state: GamepadState, schema: Dict[str, Any]):
+        action = self._base_trigger_action(schema, "rt")
+        threshold = schema.get("triggers", {}).get("threshold", 0.3)
         has_layer = bool(schema.get("rt_layer", {}))
-        
+
         if state.right_trigger > threshold and not self._rt_down:
             self._rt_down = True
             self._rt_layer_used = False
-            if not has_layer:
-                self.actions.execute_press("left_click", source="rt")
+            if action and not has_layer:
+                self._active_action["rt"] = action
+                self.actions.execute_press(action, source="rt")
         elif state.right_trigger <= threshold - 0.08 and self._rt_down:
             self._rt_down = False
-            if not has_layer:
-                self.actions.execute_release("left_click", source="rt")
-            elif not getattr(self, "_rt_layer_used", False):
-                self.actions.tap("left_click", source="rt")
+            if action and not has_layer:
+                prev_action = self._active_action.pop("rt", None)
+                if prev_action:
+                    self.actions.execute_release(prev_action, source="rt")
+            elif action and has_layer and not getattr(self, "_rt_layer_used", False):
+                self.actions.tap(action, source="rt")
 
     def _process_left_trigger(self, state: GamepadState, schema: Dict[str, Any]):
         triggers_cfg = schema.get("triggers", {})
-        action = triggers_cfg.get("lt_action")
+        action = self._base_trigger_action(schema, "lt")
+        # Precision aim (Tuning) may run with no click action mapped.
         if triggers_cfg.get("lt_precision_aim", True) and not action:
             return
         threshold = triggers_cfg.get("threshold", 0.3)
         has_layer = bool(schema.get("lt_layer", {}))
-        
+
         if state.left_trigger > threshold and not self._lt_down:
             self._lt_down = True
             self._lt_layer_used = False

@@ -254,16 +254,21 @@ class ControllerAppGUI:
         rs_click_act = _get_callout("rs_click", "Middle Click")
         self._add_stick("rs", rs_x, rs_y, cx + 290, cy + 50, "w", f"Scroll Wheel\n(Click: {rs_click_act})")
 
-        # Triggers (callouts follow current desktop schema)
-        triggers_cfg = self.mapper.config.get("schemas", {}).get("desktop", {}).get("triggers", {})
-        lt_action = triggers_cfg.get("lt_action")
+        # Triggers (callouts follow Base buttons.lt/rt, then legacy triggers)
+        desktop_cfg = self.mapper.config.get("schemas", {}).get("desktop", {})
+        btn_cfg = desktop_cfg.get("buttons", {})
+        triggers_cfg = desktop_cfg.get("triggers", {})
+        lt_action = btn_cfg["lt"] if "lt" in btn_cfg else triggers_cfg.get("lt_action")
+        rt_action = btn_cfg["rt"] if "rt" in btn_cfg else (
+            "left_click" if triggers_cfg.get("rt_left_click", True) else ""
+        )
         if triggers_cfg.get("lt_precision_aim", False) and not lt_action:
             lt_callout = "Precision Aim (Slow)"
         elif lt_action:
-            lt_callout = lt_action.replace("_", " ").title()
+            lt_callout = str(lt_action).replace("_", " ").title()
         else:
             lt_callout = "Left Trigger"
-        rt_callout = "Left Click (Drag)" if triggers_cfg.get("rt_left_click", True) else "Right Trigger"
+        rt_callout = str(rt_action).replace("_", " ").title() if rt_action else "Right Trigger"
         self._add_trigger("lt", cx - 130, cy - 165, cx - 290, cy - 105, "e", lt_callout)
         self._add_trigger("rt", cx + 130, cy - 165, cx + 290, cy - 105, "w", rt_callout)
         
@@ -340,6 +345,16 @@ class ControllerAppGUI:
     # -------------------------------------------------------------------------
     # MAPPING TAB
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _legacy_trigger_display(cfg: Dict[str, Any], btn: str) -> str:
+        """Prefill Base LT/RT from triggers.* when buttons.lt/rt are absent."""
+        triggers = cfg.get("triggers", {})
+        if btn == "lt":
+            return triggers.get("lt_action") or ""
+        if btn == "rt":
+            return "left_click" if triggers.get("rt_left_click", True) else ""
+        return ""
+
     def _load_schema_mappings(self):
         # Game Mode is pure pass-through; only the desktop schema is editable.
         schema_name = "desktop"
@@ -350,14 +365,35 @@ class ControllerAppGUI:
 
         cfg = self.mapper.config.get("schemas", {}).get(schema_name, {})
 
-        group_key = getattr(self, "_mapping_groups", {}).get(getattr(self, "mapping_group_var", tk.StringVar(value="Base Buttons")).get(), "buttons")
+        group_key = getattr(self, "_mapping_groups", {}).get(
+            getattr(self, "mapping_group_var", tk.StringVar(value="Base Buttons")).get(),
+            "buttons",
+        )
         buttons_cfg = cfg.get(group_key, {})
 
         if hasattr(self, "mapping_vars"):
             for btn, var in self.mapping_vars.items():
-                internal_val = buttons_cfg.get(btn, "")
-                display_val = internal_val.replace("_", " ").title()
-                var.set(display_val)
+                if btn in buttons_cfg:
+                    internal_val = buttons_cfg.get(btn) or ""
+                elif group_key == "buttons" and btn in ("lt", "rt"):
+                    internal_val = self._legacy_trigger_display(cfg, btn)
+                else:
+                    internal_val = ""
+                var.set(internal_val.replace("_", " ").title() if internal_val else "")
+
+        # Shift layers are chords (trigger + button); hide the trigger itself there.
+        # Base Buttons shows LT/RT as standard trigger-click mappings.
+        if hasattr(self, "_mapping_widgets"):
+            for btn, (lbl, cb) in self._mapping_widgets.items():
+                hide = (group_key == "lt_layer" and btn == "lt") or (
+                    group_key == "rt_layer" and btn == "rt"
+                )
+                if hide:
+                    lbl.grid_remove()
+                    cb.grid_remove()
+                else:
+                    lbl.grid()
+                    cb.grid()
 
     def _build_mapping_tab(self):
         container = tk.Frame(self.tab_mapping, bg="#27272a", padx=20, pady=18)
@@ -390,52 +426,57 @@ class ControllerAppGUI:
         grid_frame.pack(fill=tk.BOTH, expand=True)
         
         buttons_list = [
-            "a", "b", "x", "y", 
-            "lb", "rb", "ls_click", "rs_click", 
-            "dpad_up", "dpad_down", "dpad_left", "dpad_right", 
-            "start", "back"
+            "a", "b", "x", "y",
+            "lb", "rb", "lt", "rt",
+            "ls_click", "rs_click",
+            "dpad_up", "dpad_down", "dpad_left", "dpad_right",
+            "start", "back",
         ]
         if self.mapper.config.get("features", {}).get("discrete_paddles", False):
             buttons_list.extend(["agl", "agr"])
-        
+
         actions_list = [
             "", "left_click", "right_click", "middle_click",
             "escape", "enter", "backspace", "win_key", "alt_tab",
             "task_view", "show_desktop", "dictation_toggle", "toggle_osk",
             "copy", "paste", "undo", "save", "close_window",
             "new_tab", "close_tab", "browser_prev_tab", "browser_next_tab",
+            "browser_back", "browser_forward",
             "desktop_left", "desktop_right",
             "arrow_up", "arrow_down", "arrow_left", "arrow_right",
             "media_play_pause", "media_next", "media_prev", "volume_up", "volume_down", "volume_mute",
-            "radial_menu_modifier"
+            "radial_menu_modifier",
         ]
-        
+
         friendly_btn_names = {
             "a": "A Button", "b": "B Button", "x": "X Button", "y": "Y Button",
-            "lb": "Left Bumper", "rb": "Right Bumper", 
+            "lb": "Left Bumper", "rb": "Right Bumper",
+            "lt": "Left Trigger", "rt": "Right Trigger",
             "ls_click": "Left Stick Click", "rs_click": "Right Stick Click",
-            "dpad_up": "D-Pad Up", "dpad_down": "D-Pad Down", 
+            "dpad_up": "D-Pad Up", "dpad_down": "D-Pad Down",
             "dpad_left": "D-Pad Left", "dpad_right": "D-Pad Right",
             "start": "Start (Menu)", "back": "Back (View)",
-            "agl": "AGL (Left Grip)", "agr": "AGR (Right Grip)"
+            "agl": "AGL (Left Grip)", "agr": "AGR (Right Grip)",
         }
-        
+
         display_actions = [a.replace("_", " ").title() for a in actions_list]
-        
+
+        self._mapping_widgets = {}
         for i, btn in enumerate(buttons_list):
             row = i % 8
             col = (i // 8) * 2
-            
+
             friendly_name = friendly_btn_names.get(btn, btn.upper())
             lbl = tk.Label(grid_frame, text=friendly_name + ": ", font=("Segoe UI", 11, "bold"), bg="#27272a", fg="#f4f4f5", width=16, anchor="e")
             lbl.grid(row=row, column=col, padx=(0, 10), pady=12, sticky="e")
-            
+
             var = tk.StringVar()
             self.mapping_vars[btn] = var
-            
+
             cb = ttk.Combobox(grid_frame, textvariable=var, values=display_actions, state="readonly", width=22, style="Dark.TCombobox", font=("Segoe UI", 11))
             cb.grid(row=row, column=col+1, padx=(0, 40), pady=12, sticky="w")
-            
+            self._mapping_widgets[btn] = (lbl, cb)
+
         btn_frame = tk.Frame(container, bg="#27272a")
         btn_frame.pack(anchor="w", pady=(20, 0))
         
@@ -564,10 +605,22 @@ class ControllerAppGUI:
                 "buttons",
             )
             buttons_cfg = desktop_cfg.setdefault(group_key, {})
+            # Do not write hidden trigger rows into shift-layer maps.
+            skip = set()
+            if group_key == "lt_layer":
+                skip.add("lt")
+            elif group_key == "rt_layer":
+                skip.add("rt")
+
             for btn, var in self.mapping_vars.items():
+                if btn in skip:
+                    continue
                 display_val = var.get().strip()
                 if display_val:
                     buttons_cfg[btn] = display_val.lower().replace(" ", "_")
+                elif group_key == "buttons" and btn in ("lt", "rt"):
+                    # Explicit clear (1A): keep key so runtime does not revive triggers fallback.
+                    buttons_cfg[btn] = ""
                 else:
                     buttons_cfg.pop(btn, None)
 
