@@ -42,23 +42,22 @@
         "back": "radial_menu_modifier",
         "a": "left_click",
         "lb": "browser_back",
-        "lt": "left_click",
-        "rt": "backspace"
+        "lt": "enter",
+        "rt": "left_click"
       },
       "lt_layer": {
         "a": "copy",
         "b": "paste",
-        "x": "save",
-        "y": "undo",
-        "rb": "browser_next_tab"
+        "x": "undo",
+        "y": "save",
+        "rb": "desktop_right"
       },
       "rt_layer": {
-        "lb": "browser_prev_tab"
+        "lb": "desktop_left"
       },
       "double_clicks": {
         "back": "task_view",
-        "lb": "browser_prev_tab",
-        "rb": "browser_next_tab"
+        "b": "backspace"
       }
     }
   },
